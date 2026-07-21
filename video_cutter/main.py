@@ -73,17 +73,17 @@ def main():
             # Создаем XML файл для FCPX
             if good_frames:
                 xml_file = importer.create_fcpx_xml(
-                    good_frames, 
-                    f"Wedding_{os.path.splitext(video_file)[0]}"
+                    good_frames,
+                    f"Wedding_{os.path.splitext(video_file)[0]}",
+                    video_path=input_path
                 )
                 logger.info(f"Создан XML файл для импорта: {xml_file}")
-            
+
         except Exception as e:
             logger.error(f"❌ Ошибка при обработке {video_file}: {str(e)}")
             continue
-    
+
     logger.info("🏁 Обработка завершена")
 
 if __name__ == "__main__":
     main()
-
