@@ -1,3 +1,5 @@
+STILL IN DEVELOPMENT...
+
 # Video-Cutter
 
 Инструмент для обрезки видеофайлов.
