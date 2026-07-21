@@ -18,12 +18,24 @@ class FCPXImporter:
         os.makedirs(output_dir, exist_ok=True)
         full_path = os.path.join(output_dir, xml_filename)
 
-        # Создаем корневой элемент
+        # Создаем корневой элемент с DTD
         root = ET.Element('fcpxml', {'version': '1.10'})
 
-        # Создаем library и event
-        library = ET.SubElement(root, 'library')
-        event = ET.SubElement(library, 'event', {'name': f'{project_name} Event'})
+        # Создаем resources section
+        resources = ET.SubElement(root, 'resources')
+
+        # Создаем формат в resources
+        format_4k_2997 = ET.SubElement(resources, 'format', {
+            'id': 'H.264_4K2997',
+            'name': 'H.264 4K 29.97fps',
+            'width': '3840',
+            'height': '2160',
+            'frameRate': '29.97',
+            'pixelAspect': '1:1'
+        })
+
+        # Создаем event
+        event = ET.SubElement(root, 'event', {'name': f'{project_name} Event'})
         project = ET.SubElement(event, 'project', {'name': project_name})
 
         # Создаем sequence с форматом для 4K 29.97fps
@@ -32,15 +44,15 @@ class FCPXImporter:
             'duration': '0s',
             'tcStart': '0s',
             'tcFormat': 'DF',
-            'format': 'H.264_4K2997'  # Формат для 4K 29.97fps
+            'format': 'H.264_4K2997'
         })
 
         spine = ET.SubElement(sequence, 'spine')
 
         # Если указан путь к видео, создаем asset
         if video_path and os.path.exists(video_path):
-            # Создаем asset (ассеты должны быть в library)
-            asset = ET.SubElement(library, 'asset', {
+            # Создаем asset в resources (не в library)
+            asset = ET.SubElement(resources, 'asset', {
                 'id': 'r1',
                 'name': 'Source Video',
                 'src': f'file://{video_path}',
