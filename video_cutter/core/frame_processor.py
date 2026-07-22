@@ -31,17 +31,17 @@ class FrameProcessor:
         try:
             # 1. Размытие (Blur)
             blur_score = self._calculate_blur(frame)
-            print(f"DEBUG blur_score type: {type(blur_score)}, value: {blur_score}")
+            #print(f"DEBUG blur_score type: {type(blur_score)}, value: {blur_score}")
             metrics['blur'] = blur_score
 
             # 2. Экспозиция (яркость)
             exposure_score = self._calculate_exposure(frame)
-            print(f"DEBUG exposure_score type: {type(exposure_score)}, value: {exposure_score}")
+            #print(f"DEBUG exposure_score type: {type(exposure_score)}, value: {exposure_score}")
             metrics['exposure'] = exposure_score
 
             # 3. Контрастность
             contrast_score = self._calculate_contrast(frame)
-            print(f"DEBUG contrast_score type: {type(contrast_score)}, value: {contrast_score}")
+            #print(f"DEBUG contrast_score type: {type(contrast_score)}, value: {contrast_score}")
             metrics['contrast'] = contrast_score
 
             # 4. Движение (простой анализ)

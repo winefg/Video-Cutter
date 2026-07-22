@@ -13,7 +13,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Известные "круглые" частоты кадров и их точное рациональное представление
-# frameDuration (числитель/знаменатель) + признак drop-frame таймкода.
 _KNOWN_FRAME_RATES = [
     (23.976, 1001, 24000, False),
     (24.0, 1, 24, False),
@@ -45,9 +44,18 @@ class FCPXImporter:
             (по умолчанию 1 кадр = ровно тот самый "хороший кадр"). Можно
             увеличить, если нужен клип подлиннее вокруг найденного кадра.
         """
+
+        # Добавляем проверку, что video_path передан
+        if not video_path:
+            raise ValueError("Путь к видеофайлу должен быть указан!")
+
+        # Проверяем существование файла
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f"Видео файл не найден: {video_path}")
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         xml_filename = f'{project_name}_{timestamp}.fcpxml'
-        output_dir = './output_videos'
+        output_dir = './output_videos'  # Абсолютный путь
         os.makedirs(output_dir, exist_ok=True)
         full_path = os.path.join(output_dir, xml_filename)
 
@@ -73,23 +81,6 @@ class FCPXImporter:
         # Важно: FCPXML DTD не поддерживает 'frameRate' и 'pixelAspect'.
         # Частота кадров задается через frameDuration (рациональная дробь,
         # "время одного кадра"), вычисленная из реального fps источника.
-        #
-        # ВАЖНО про id: несмотря на то, что символ '.' формально допустим
-        # в XML Name, парсер Final Cut Pro на практике не принимает
-        # описательные id (например 'H.264_4K2997') как валидный IDREF и
-        # выдает "Encountered an unexpected value" на любой атрибут, который
-        # на него ссылается. Все реальные экспорты FCP используют простые id
-        # вида 'r1', 'r2', ...
-        #
-        # ВАЖНО про уникальность: id должен быть уникален не только внутри
-        # ЭТОГО файла, но и во всей библиотеке FCP, куда его импортируют.
-        # При повторном импорте FCP сопоставляет ресурсы по id: если в
-        # библиотеке уже есть, например, 'r1' с ДРУГИМИ шириной/высотой/fps
-        # (из более раннего теста или другого исходника), новый 'r1' будет
-        # считаться конфликтующим — отсюда "Encountered an unexpected value"
-        # на @format и, как следствие, "Invalid edit with no respective
-        # media" на всех клипах, ссылающихся на этот формат. Поэтому
-        # генерируем случайный уникальный id на каждый вызов.
         FORMAT_ID = f'r_fmt_{uuid.uuid4().hex[:12]}'
         ET.SubElement(resources, 'format', {
             'id': FORMAT_ID,
@@ -97,20 +88,12 @@ class FCPXImporter:
             'width': str(source['width']),
             'height': str(source['height']),
             'frameDuration': self._frames_to_time(1, fd_num, fd_den),
-            # Без colorSpace Final Cut Pro на практике не принимает
-            # произвольный format как валидный для использования в
-            # sequence/@format — выдает "Encountered an unexpected value"
-            # именно на этот атрибут, даже если сам format синтаксически
-            # корректен. Rec. 709 — стандартное цветовое пространство для
-            # обычного SDR HD/UHD видео.
             'colorSpace': '1-1-1 (Rec. 709)',
         })
 
         event = ET.SubElement(root, 'event', {'name': f'{project_name} Event'})
         project = ET.SubElement(event, 'project', {'name': project_name})
 
-        # <sequence> в FCPXML не имеет атрибута 'name' — имя задается только
-        # на уровне <project>.
         sequence = ET.SubElement(project, 'sequence', {
             'duration': '0s',
             'tcStart': '0s',
@@ -129,11 +112,7 @@ class FCPXImporter:
             last_frame_number = sorted_frames[-1].get('frame_number', 0)
             total_source_frames = source['total_frames'] or (last_frame_number + frame_clip_duration_frames)
 
-            # ВАЖНО: в FCPXML 1.10 у <asset> нет атрибута 'src'. По DTD
-            # content-модель asset — это (media-rep+, metadata?), то есть
-            # путь к файлу задается ДОЧЕРНИМ элементом <media-rep>, а не
-            # атрибутом на самом asset. Отсюда и ошибка "expecting
-            # (media-rep+, metadata?)" / "No declaration for attribute src".
+            # Создаем asset с правильным путем
             asset = ET.SubElement(resources, 'asset', {
                 'id': ASSET_ID,
                 'name': os.path.basename(video_path),
@@ -143,32 +122,18 @@ class FCPXImporter:
                 'hasVideo': '1',
                 'videoSources': '1',
             })
-            
-            # Добавляем media-rep элемент для указания пути к файлу
-            # Используем правильный путь с file:// префиксом
-            if video_path and os.path.exists(video_path):
-                abs_video_path = os.path.abspath(video_path)
-                media_rep = ET.SubElement(asset, 'media-rep', {
-                    'kind': 'original-media',
-                    'src': f'file://{abs_video_path}',
-                })
-            else:
-                # Если файл не существует, создаем пустой media-rep
-                media_rep = ET.SubElement(asset, 'media-rep', {
-                    'kind': 'original-media',
-                    'src': 'file://',
-                })
 
-            # Создаем asset-clip (не clip!) для каждого отобранного кадра.
-            # 'ref' — ссылка на asset по id. 'start' — реальная позиция
-            # этого кадра внутри исходника (из frame_data['frame_number']).
-            # 'offset' — последовательная позиция клипа на таймлинии
-            # итоговой секвенции (клипы идут друг за другом по порядку).
+
+            # На это:
+            media_rep = ET.SubElement(asset, 'media-rep', {
+                'kind': 'original-media',
+                'src': f'file://{video_path}',
+            })
+
+            # Создаем asset-clip для каждого отобранного кадра
             cumulative_offset_frames = 0
             for frame_data in sorted_frames:
                 frame_number = frame_data.get('frame_number', 1)
-                # frame_number считается с 1 (см. VideoAnalyzer.analyze_video),
-                # переводим в 0-based позицию для внутреннего таймкода asset'а.
                 source_start_frames = max(frame_number - 1, 0)
 
                 offset = self._frames_to_time(cumulative_offset_frames, fd_num, fd_den)
@@ -188,8 +153,6 @@ class FCPXImporter:
             # Реальная длительность секвенции = сумма длительностей всех клипов.
             sequence.set('duration', self._frames_to_time(cumulative_offset_frames, fd_num, fd_den))
         else:
-            # Без video_path или без good_frames валидный asset-clip создать
-            # нельзя (не на что ставить 'ref') — секвенция останется пустой.
             logger.warning(
                 'video_path не передан/не найден или good_frames пуст — '
                 'клипы не будут добавлены в проект.'
@@ -206,9 +169,13 @@ class FCPXImporter:
             raise
 
     def _probe_source(self, video_path: str):
-        """Читает реальные параметры исходного видео через OpenCV
-        (разрешение, fps, общее число кадров). Возвращает None, если
-        видео открыть не удалось или OpenCV недоступен."""
+        """Читает реальные параметры исходного видео через OpenCV"""
+
+        # Проверяем существование файла перед попыткой открыть его
+        if not os.path.exists(video_path):
+            logger.error(f"Видео файл не существует: {video_path}")
+            return None
+
         try:
             import cv2
         except ImportError:
@@ -217,11 +184,12 @@ class FCPXImporter:
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
+            logger.error(f"Не удалось открыть видео файл: {video_path}")
             return None
 
         try:
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1920
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 1080
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 3840
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 2160
             fps = cap.get(cv2.CAP_PROP_FPS) or 29.97
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or None
         finally:
@@ -236,8 +204,7 @@ class FCPXImporter:
 
     def _fps_to_frame_duration(self, fps: float):
         """Переводит fps в точную рациональную пару (числитель, знаменатель)
-        для frameDuration + признак drop-frame таймкода. Для нестандартных
-        fps подбирает ближайшую рациональную аппроксимацию."""
+        для frameDuration + признак drop-frame таймкода."""
         for known_fps, num, den, drop_frame in _KNOWN_FRAME_RATES:
             if abs(fps - known_fps) < 0.05:
                 return num, den, drop_frame
@@ -248,11 +215,7 @@ class FCPXImporter:
         return frac.numerator, frac.denominator, False
 
     def _frames_to_time(self, frames: int, fd_num: int = 1001, fd_den: int = 30000) -> str:
-        """Переводит количество кадров в рациональную строку времени FCPXML,
-        кратную frameDuration (fd_num/fd_den), например '15015/30000s'.
-        Дробь по возможности сокращается через НОД. Если дробь сокращается
-        до целого числа секунд, возвращает короткую форму, например '4s'
-        (именно так FCP форматирует целые значения)."""
+        """Переводит количество кадров в рациональную строку времени FCPXML"""
         if frames == 0:
             return '0s'
         numerator = frames * fd_num

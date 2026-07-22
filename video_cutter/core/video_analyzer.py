@@ -88,15 +88,17 @@ class VideoAnalyzer:
         print(f"DEBUG: Metrics - blur={metrics.get('blur', 0)}, "
               f"exposure={metrics.get('exposure', 0)}, "
               f"contrast = {metrics.get('contrast', 0)}")
+              
+        print(f"DEBUG: blur={blur}, exposure={exposure}, contrast = {contrast} ")
+        print(f"DEBUG: blur < 20? {blur < 20}")
+        print(f"DEBUG: exposure < 30 or exposure > 240? {exposure < 30 or exposure > 240}")
+        print(f"DEBUG: contrast < 15? {contrast < 15}")
         """
         blur = metrics.get('blur', 0)
         exposure = metrics.get('exposure', 0)
         contrast = metrics.get('contrast', 0)
 
-        print(f"DEBUG: blur={blur}, exposure={exposure}, contrast = {contrast} ")
-        print(f"DEBUG: blur < 20? {blur < 20}")
-        print(f"DEBUG: exposure < 30 or exposure > 240? {exposure < 30 or exposure > 240}")
-        print(f"DEBUG: contrast < 15? {contrast < 15}")
+
 
         # Нормализованные критерии для реальных значений
         # Размытие (Laplacian variance):
