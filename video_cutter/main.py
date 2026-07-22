@@ -28,7 +28,7 @@ def setup_logging():
     
     return logging.getLogger(__name__)
 
-def main(input_dir="input_videos"):
+def main(input_path="input_videos"):
     """Основная функция"""
     logger = setup_logging()
     logger.info("🚀 Запуск Video Cutter")
@@ -36,17 +36,25 @@ def main(input_dir="input_videos"):
     # Проверяем наличие входной папки
     output_dir = "output_videos"
     
-    if not os.path.exists(input_dir):
-        os.makedirs(input_dir)
-        logger.warning(f"Создана папка для входных файлов: {input_dir}")
-    
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         logger.warning(f"Создана папка для выходных файлов: {output_dir}")
     
-    # Получаем список видеофайлов
-    video_files = [f for f in os.listdir(input_dir) 
-                   if f.lower().endswith(('.mov', '.mp4', '.avi'))]
+    # Обрабатываем входной путь - может быть файлом или директорией
+    video_files = []
+    
+    if os.path.isfile(input_path):
+        # Если это файл, добавляем его в список
+        video_files = [os.path.basename(input_path)]
+        input_dir = os.path.dirname(input_path)
+    elif os.path.isdir(input_path):
+        # Если это директория, получаем все видеофайлы
+        input_dir = input_path
+        video_files = [f for f in os.listdir(input_dir) 
+                       if f.lower().endswith(('.mov', '.mp4', '.avi'))]
+    else:
+        logger.error(f"Указанный путь не существует: {input_path}")
+        return
     
     if not video_files:
         logger.warning("Нет видеофайлов для обработки")
@@ -60,12 +68,18 @@ def main(input_dir="input_videos"):
     
     # Обрабатываем каждый файл
     for video_file in video_files:
-        input_path = os.path.join(input_dir, video_file)
+        if os.path.isfile(input_path):
+            # Если input_path был файлом, используем его как путь к файлу
+            input_path_full = input_path
+        else:
+            # Иначе формируем полный путь к файлу
+            input_path_full = os.path.join(input_dir, video_file)
+            
         logger.info(f"🔄 Обработка файла: {video_file}")
         
         try:
             # Анализируем видео и получаем хорошие кадры
-            good_frames = analyzer.analyze_video(input_path)
+            good_frames = analyzer.analyze_video(input_path_full)
             
             logger.info(f"✅ Найдено {len(good_frames)} хороших кадров")
             
@@ -74,7 +88,7 @@ def main(input_dir="input_videos"):
                 xml_file = importer.create_fcpx_xml(
                     good_frames,
                     f"Wedding_{os.path.splitext(video_file)[0]}",
-                    video_path=input_path
+                    video_path=input_path_full
                 )
                 logger.info(f"Создан XML файл для импорта: {xml_file}")
 
@@ -87,8 +101,8 @@ def main(input_dir="input_videos"):
 if __name__ == "__main__":
     # Allow input directory to be passed as command line argument
     if len(sys.argv) > 1:
-        input_directory = sys.argv[1]
+        input_path = sys.argv[1]
     else:
-        input_directory = "input_videos"
+        input_path = "input_videos"
     
-    main(input_directory)
+    main(input_path)
