@@ -1,3 +1,7 @@
+"""
+FCPX Importer for video cutter project
+"""
+
 import os
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -140,7 +144,9 @@ class FCPXImporter:
                 'hasVideo': '1',
                 'videoSources': '1',
             })
-            ET.SubElement(asset, 'media-rep', {
+            
+            # Добавляем media-rep элемент для указания пути к файлу
+            media_rep = ET.SubElement(asset, 'media-rep', {
                 'kind': 'original-media',
                 'src': f'file://{os.path.abspath(video_path)}',
             })
