@@ -28,13 +28,12 @@ def setup_logging():
     
     return logging.getLogger(__name__)
 
-def main():
+def main(input_dir="input_videos"):
     """Основная функция"""
     logger = setup_logging()
     logger.info("🚀 Запуск Video Cutter")
     
     # Проверяем наличие входной папки
-    input_dir = "input_videos"
     output_dir = "output_videos"
     
     if not os.path.exists(input_dir):
@@ -86,4 +85,10 @@ def main():
     logger.info("🏁 Обработка завершена")
 
 if __name__ == "__main__":
-    main()
+    # Allow input directory to be passed as command line argument
+    if len(sys.argv) > 1:
+        input_directory = sys.argv[1]
+    else:
+        input_directory = "input_videos"
+    
+    main(input_directory)
