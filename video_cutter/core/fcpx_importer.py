@@ -47,7 +47,7 @@ class FCPXImporter:
         """
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         xml_filename = f'{project_name}_{timestamp}.fcpxml'
-        output_dir = 'output_videos'
+        output_dir = './output_videos'
         os.makedirs(output_dir, exist_ok=True)
         full_path = os.path.join(output_dir, xml_filename)
 
