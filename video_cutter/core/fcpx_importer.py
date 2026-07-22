@@ -145,10 +145,19 @@ class FCPXImporter:
             })
             
             # Добавляем media-rep элемент для указания пути к файлу
-            media_rep = ET.SubElement(asset, 'media-rep', {
-                'kind': 'original-media',
-                'src': f'file://{os.path.abspath(video_path)}',
-            })
+            # Используем правильный путь с file:// префиксом
+            if video_path and os.path.exists(video_path):
+                abs_video_path = os.path.abspath(video_path)
+                media_rep = ET.SubElement(asset, 'media-rep', {
+                    'kind': 'original-media',
+                    'src': f'file://{abs_video_path}',
+                })
+            else:
+                # Если файл не существует, создаем пустой media-rep
+                media_rep = ET.SubElement(asset, 'media-rep', {
+                    'kind': 'original-media',
+                    'src': 'file://',
+                })
 
             # Создаем asset-clip (не clip!) для каждого отобранного кадра.
             # 'ref' — ссылка на asset по id. 'start' — реальная позиция
