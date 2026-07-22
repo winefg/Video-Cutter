@@ -25,7 +25,6 @@ _KNOWN_FRAME_RATES = [
     (60.0, 1, 60, False),
 ]
 
-
 class FCPXImporter:
     def __init__(self):
         self.version = '1.10'

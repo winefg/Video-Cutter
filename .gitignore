@@ -21,3 +21,4 @@ logs/
 # Video files
 input_videos/
 output_videos/
+.aider*
