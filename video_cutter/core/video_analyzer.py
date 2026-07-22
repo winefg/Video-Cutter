@@ -19,9 +19,12 @@ class VideoAnalyzer:
 
     def __init__(self):
         self.frame_processor = FrameProcessor()
-        self.min_blur_threshold = 100
-        self.min_exposure_threshold = 30
-        self.max_motion_threshold = 500
+        # Пороги для определения хороших кадров (можно настраивать)
+        # Снижены для более гибкого анализа
+        self.min_blur_threshold = 50
+        self.min_exposure_threshold = 20
+        self.max_exposure_threshold = 230
+        self.min_contrast_threshold = 10
 
     def analyze_video(self, video_path: str) -> List[Dict]:
         """
@@ -56,7 +59,16 @@ class VideoAnalyzer:
                 metrics = self.frame_processor.process_frame(frame, frame_count)
 
                 # Проверяем, хороший ли кадр
-                if self.is_good_frame(metrics):
+                is_good = self.is_good_frame(metrics)
+
+                # Логируем метрики для каждого кадра (только для первых нескольких)
+                if frame_count <= 5:
+                    logger.info(f"Кадр {frame_count}: blur={metrics.get('blur', 0):.2f}, "
+                               f"exposure={metrics.get('exposure', 0):.2f}, "
+                               f"contrast={metrics.get('contrast', 0):.2f}, "
+                               f"good={is_good}")
+
+                if is_good:
                     good_frames.append({
                         'frame_number': frame_count,
                         'timestamp': frame_count / 29.97,  # Предполагаем 30 FPS
@@ -83,41 +95,30 @@ class VideoAnalyzer:
         :param metrics: метрики кадра
         :return: True если кадр хороший
         """
-
-        """
-        print(f"DEBUG: Metrics - blur={metrics.get('blur', 0)}, "
-              f"exposure={metrics.get('exposure', 0)}, "
-              f"contrast = {metrics.get('contrast', 0)}")
-        """
         blur = metrics.get('blur', 0)
         exposure = metrics.get('exposure', 0)
         contrast = metrics.get('contrast', 0)
 
-        print(f"DEBUG: blur={blur}, exposure={exposure}, contrast = {contrast} ")
-        print(f"DEBUG: blur < 20? {blur < 20}")
-        print(f"DEBUG: exposure < 30 or exposure > 240? {exposure < 30 or exposure > 240}")
-        print(f"DEBUG: contrast < 15? {contrast < 15}")
-
-        # Нормализованные критерии для реальных значений
-        # Размытие (Laplacian variance):
-        # - 0-20: очень размыто
-        # - 20-50: размыто
-        # - 50-100: нормально
-        # - >100: хорошо
+        # Логирование для отладки (можно удалить в продакшене)
+        logger.debug(f"Frame metrics - blur: {blur}, exposure: {exposure}, contrast: {contrast}")
 
         # Проверяем размытие (чем выше значение, тем меньше размытость)
-        if blur < 20:    # Снижаем порог размытия
+        if blur < self.min_blur_threshold:
+            logger.debug(f"Кадр отклонен по размытию: {blur} < {self.min_blur_threshold}")
             return False
 
-    # Проверяем экспозицию
-        # Экспозиция: от 0 до 255
-        if exposure < 30 or exposure > 240:    # Слишком темное или слишком светлое
+        # Проверяем экспозицию
+        if exposure < self.min_exposure_threshold or exposure > self.max_exposure_threshold:
+            logger.debug(f"Кадр отклонен по экспозиции: {exposure} не в диапазоне "
+                       f"{self.min_exposure_threshold}-{self.max_exposure_threshold}")
             return False
 
-    # Контрастность: чем выше, тем лучше
-        if contrast < 15:  # Снижаем порог контраста
+        # Проверяем контрастность
+        if contrast < self.min_contrast_threshold:
+            logger.debug(f"Кадр отклонен по контрастности: {contrast} < {self.min_contrast_threshold}")
             return False
 
+        logger.debug("Кадр прошел все проверки")
         return True
 
 
